@@ -4,20 +4,20 @@ import time
 import requests
 from auth import get_service_account_token
 
-BOT_TOKEN         = os.environ['TELEGRAM_BOT_TOKEN']
-PROJECT_ID        = os.environ['FIREBASE_PROJECT_ID']
-FIRESTORE_BASE    = (
-    f"https://firestore.googleapis.com/v1/projects/"
-    f"{PROJECT_ID}/databases/(default)/documents"
-)
-ACCESS_COLL       = "accessCodes"
-ASSIGN_COLL       = "userCodes"
-FORM_PREFILL_BASE = (
-    "https://docs.google.com/forms/d/e/"
-    "1FAIpQLSctMoFicVK8PFP2KzFo-mByt3GR2bhxhiGY40m14BrUa1tPCQ/"
-    "viewform?usp=pp_url&entry.1575034971="
-)
-ONBOARDING_GROUP  = os.environ['ONBOARDING_GROUP_ID']
+# telegram_poller.py
+# …other imports…
+from auth import get_service_account_token
+
+BOT_TOKEN        = os.environ['TELEGRAM_BOT_TOKEN']
+PROJECT_ID       = os.environ['FIREBASE_PROJECT_ID']
+FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
+ACCESS_COLL      = "accessCodes"
+ASSIGN_COLL      = "userCodes"
+
+# ← NEW: point at your Apps Script /exec URL
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbxtZezPKizkiTtuce1wVWlNA7psEaxmoCjNuHzyRXFyGODy0hY9nnN9BNqwrOZshjf0vQ/exec"
+ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']
+
 
 def telegram(method, payload):
     return requests.post(
@@ -146,18 +146,19 @@ def poll():
                     mark_used(code)
                     upsert_assignment(cid, code, True)
 
-                    # HTML‐mode DM
-                    dm_text = (
-                        "✅ <b>Verification complete!</b>\n\n"
-                        f"🔑 <b>{code}</b>\n\n"
-                        "Fill the form to finish signing up:\n"
-                        f"<a href=\"{FORM_PREFILL_BASE}{code}\">Click here to open the form</a>"
-                    )
-                    telegram("sendMessage", {
-                        "chat_id": cid,
-                        "text": dm_text,
-                        "parse_mode": "HTML"
-                    })
+    # Send them the DM with HTML formatting
+    dm_text = (
+        "✅ <b>Verification complete!</b>\n\n"
+        f"🔑 <b>{code}</b>\n\n"
+        "Finish signing up here:\n"
+        f"<a href=\"{WEBAPP_URL}?code={code}\">Open the sign-up form</a>"
+    )
+    telegram("sendMessage", {
+        "chat_id": cid,
+        "text": dm_text,
+        "parse_mode": "HTML"
+    })
+
 
         time.sleep(1)
 
