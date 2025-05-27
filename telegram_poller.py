@@ -16,6 +16,7 @@ def save_offset(offset):
     open(OFFSET_FILE, 'w').write(str(offset))
 
 def poll():
+    print("🔄 Polling Telegram…")
     offset = load_offset()
     url    = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {'timeout':14, 'offset': offset, 'allowed_updates': ['message']}
