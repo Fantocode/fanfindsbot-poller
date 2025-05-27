@@ -99,6 +99,7 @@ def upsert_assignment(chat_id, code, sent):
 def poll():
     offset=0
     while True:
+        print("🟢 Polling Telegram…") 
         for upd in get_updates(offset):
             offset = upd["update_id"]+1
             msg    = upd.get("message",{})
