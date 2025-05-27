@@ -119,6 +119,7 @@ def poll():
     offset = 0
     while True:
         print("🟢 Polling Telegram…")
+        print("🟢 Polling Telegram… waiting for updates")
         for upd in get_updates(offset):
             offset = upd["update_id"] + 1
             msg    = upd.get("message", {})
