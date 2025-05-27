@@ -149,7 +149,7 @@ def poll():
                         "✅ <b>Verification complete!</b>\n\n"
                         f"🔑 <b>{code}</b>\n\n"
                         "Finish signing up here:\n"
-                        f"<a href=\"{WEBAPP_URL}?code={code}\">Open the sign-up form</a>"
+                        f"<a href=\"{WEBAPP_URL}?code={code}\">Use code to open & complete the sign-up form</a>"
                     )
                     telegram("sendMessage", {
                         "chat_id": cid,
