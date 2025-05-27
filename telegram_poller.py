@@ -4,21 +4,20 @@ import time
 import requests
 from auth import get_service_account_token
 
-# telegram_poller.py
-# …other imports…
-from auth import get_service_account_token
+# ─── CONFIG ─────────────────────────────────────────
+BOT_TOKEN       = os.environ['TELEGRAM_BOT_TOKEN']
+PROJECT_ID      = os.environ['FIREBASE_PROJECT_ID']
+FIRESTORE_BASE  = (
+    f"https://firestore.googleapis.com/v1/projects/"
+    f"{PROJECT_ID}/databases/(default)/documents"
+)
+ACCESS_COLL     = "accessCodes"
+ASSIGN_COLL     = "userCodes"
+# ← Your Apps Script /exec URL:
+WEBAPP_URL      = "https://script.google.com/macros/s/AKfycbxtZezPKizkiTtuce1wVWlNA7psEaxmoCjNuHzyRXFyGODy0hY9nnN9BNqwrOZshjf0vQ/exec"
+ONBOARDING_GROUP= os.environ['ONBOARDING_GROUP_ID']
 
-BOT_TOKEN        = os.environ['TELEGRAM_BOT_TOKEN']
-PROJECT_ID       = os.environ['FIREBASE_PROJECT_ID']
-FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
-ACCESS_COLL      = "accessCodes"
-ASSIGN_COLL      = "userCodes"
-
-# ← NEW: point at your Apps Script /exec URL
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbxtZezPKizkiTtuce1wVWlNA7psEaxmoCjNuHzyRXFyGODy0hY9nnN9BNqwrOZshjf0vQ/exec"
-ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']
-
-
+# ─── TELEGRAM HELPERS ──────────────────────────────
 def telegram(method, payload):
     return requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
@@ -37,6 +36,7 @@ def get_member_status(chat_id):
     })
     return resp.get("result", {}).get("status")
 
+# ─── FIRESTORE HELPERS ─────────────────────────────
 def fetch_unused_code():
     q = {
       "structuredQuery": {
@@ -101,40 +101,38 @@ def upsert_assignment(chat_id, code, sent):
     )
 
 def delete_assignment(chat_id):
-    """ Remove their assignment so re-joins or leaves reset them """
+    """Remove a user’s assignment when they leave the group."""
     url   = f"{FIRESTORE_BASE}/{ASSIGN_COLL}/{chat_id}"
     token = get_service_account_token()
     requests.delete(url, headers={"Authorization": f"Bearer {token}"})
 
+# ─── MAIN LOOP ──────────────────────────────────────
 def poll():
     offset = 0
     while True:
         for upd in get_updates(offset):
             offset = upd["update_id"] + 1
-            msg    = upd.get("message", {})
-            text   = msg.get("text", "")
-            chat   = msg.get("chat", {})
-            cid    = chat.get("id")
+            msg  = upd.get("message", {})
+            text = msg.get("text", "")
+            chat = msg.get("chat", {})
+            cid  = chat.get("id")
 
-            # 1) Handle service messages: left or new member
+            # Service events: delete assignments on leave/join
             if msg.get("left_chat_member"):
-                uid = msg["left_chat_member"]["id"]
-                delete_assignment(uid)
+                delete_assignment(msg["left_chat_member"]["id"])
             if msg.get("new_chat_member"):
-                uid = msg["new_chat_member"]["id"]
-                delete_assignment(uid)
+                delete_assignment(msg["new_chat_member"]["id"])
 
-            # 2) Only respond to /getcode in a private chat
+            # Only handle /getcode in a 1:1 chat
             if text == "/getcode" and chat.get("type") == "private":
                 status = get_member_status(cid)
-                if status not in ("member", "administrator", "creator"):
-                    # They’ve DM'd when not in the group → reset them
+                if status not in ("member","administrator","creator"):
                     delete_assignment(cid)
                     continue
 
                 rec = get_assignment(cid)
                 if not rec or not rec.get("code"):
-                    # New or re-joined → issue a fresh code
+                    # New or re-joined → issue code
                     code = fetch_unused_code()
                     if not code:
                         telegram("sendMessage", {
@@ -146,19 +144,19 @@ def poll():
                     mark_used(code)
                     upsert_assignment(cid, code, True)
 
-    # Send them the DM with HTML formatting
-    dm_text = (
-        "✅ <b>Verification complete!</b>\n\n"
-        f"🔑 <b>{code}</b>\n\n"
-        "Finish signing up here:\n"
-        f"<a href=\"{WEBAPP_URL}?code={code}\">Use your unique access code above to complete the sign-up form</a>"
-    )
-    telegram("sendMessage", {
-        "chat_id": cid,
-        "text": dm_text,
-        "parse_mode": "HTML"
-    })
-
+                    # ← HTML-mode DM pointing at your Web App
+                    dm_text = (
+                        "✅ <b>Verification complete!</b>\n\n"
+                        f"🔑 <b>{code}</b>\n\n"
+                        "Finish signing up here:\n"
+                        f"<a href=\"{WEBAPP_URL}?code={code}\">Open the sign-up form</a>"
+                    )
+                    telegram("sendMessage", {
+                        "chat_id": cid,
+                        "text": dm_text,
+                        "parse_mode": "HTML"
+                    })
+                # else: already had a code → skip
 
         time.sleep(1)
 
