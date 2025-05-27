@@ -115,17 +115,21 @@ def poll():
                     mark_used(code)
                     upsert_assignment(cid, code, True)
 
-                    dm_text = (
-                        f"✅ Verification complete!\n\n"
-                        f"🔑 *{code}*\n\n"
-                        f"Fill the form to finish signing up:\n"
-                        f"{FORM_PREFILL_BASE}{code}"
-                    )
-                    print("  📨 sending DM:", dm_text)
-                    dm_resp = telegram("sendMessage",{
-                        "chat_id":cid,
-                        "text":dm_text,
-                        "parse_mode":"Markdown"
+                        # … after upsert_assignment() …
+    dm_text = (
+        "✅ <b>Verification complete!</b>\n\n"
+        f"🔑 <b>{code}</b>\n\n"
+        "Fill the form to finish signing up:\n"
+        f"<a href=\"{FORM_PREFILL_BASE}{code}\">Click here to open the form</a>"
+    )
+    print("  📨 sending DM (HTML)…", dm_text)
+    dm_resp = telegram("sendMessage", {
+        "chat_id": cid,
+        "text": dm_text,
+        "parse_mode": "HTML"
+    })
+    print("  📨 sendMessage response:", dm_resp)
+
                     })
                     print("  📨 sendMessage response:", dm_resp)
                 else:
