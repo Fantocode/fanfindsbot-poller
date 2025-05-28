@@ -7,7 +7,7 @@ PROJECT_ID       = os.environ['FIREBASE_PROJECT_ID']
 FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
 ACCESS_COLL      = "accessCodes"
 ASSIGN_COLL      = "userCodes"
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbxtZezPKizkiTtuce1wVWlNA7psEaxmoCjNuHzyRXFyGODy0hY9nnN9BNqwrOZshjf0vQ/exec"
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbzYRioU52UqAJ5o20wBa3_UxJ3PVeD5Tkh01O1WmRoX1ZVzatLDfCuuZX9YJuJ4O0LBVw/exec"
 ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']
 
 def telegram(method, payload):
