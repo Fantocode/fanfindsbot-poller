@@ -114,10 +114,13 @@ def poll():
                     upsert_assignment(cid, code, True)
 
                     dm_text = (
+                        dm_text = (
                         "✅ <b>Verification complete!</b>\n\n"
                         f"🔑 <b>{code}</b>\n\n"
-                        "Finish signing up here:\n"
-                        f"<a href=\"{WEBAPP_URL}?code={code}\">Link</a>"
+                        "Finish signing up here: "
+                        f"<a href=\"{WEBAPP_URL}\">Link</a>"
+                    )
+
                     )
                     telegram("sendMessage", {
                         "chat_id":cid, "text":dm_text, "parse_mode":"HTML"
