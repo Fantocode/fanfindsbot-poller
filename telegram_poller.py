@@ -161,7 +161,7 @@ def poll():
                             continue
 
                         # Mark code as used in accessCodes
-                        mark_used(code)
+                        #mark_used(code)
                         # Insert into userCodes: codeSent = true
                         upsert_assignment(str(cid), code, True)
 
