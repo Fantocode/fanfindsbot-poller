@@ -98,7 +98,7 @@ def poll():
             if msg.get("new_chat_member"):
                 delete_assignment(msg["new_chat_member"]["id"])
 
-            if text == "/start" and chat.get("type")=="private":
+            if text == "/getcode" and chat.get("type")=="private":
                 status = get_member_status(cid)
                 if status not in ("member","administrator","creator"):
                     delete_assignment(cid)
