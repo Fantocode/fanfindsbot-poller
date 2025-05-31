@@ -7,7 +7,7 @@ PROJECT_ID       = os.environ['FIREBASE_PROJECT_ID']
 FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
 ACCESS_COLL      = "accessCodes"
 ASSIGN_COLL      = "userCodes"
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbzYRioU52UqAJ5o20wBa3_UxJ3PVeD5Tkh01O1WmRoX1ZVzatLDfCuuZX9YJuJ4O0LBVw/exec"
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbxkXt5SomKQxvW2og2xW1cdghA9i6h0UPjTed_UpdPzFWnle51dWPyyp7jxSM-YvIFU0w/exec"
 ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']
 
 def telegram(method, payload):
@@ -117,7 +117,7 @@ def poll():
                         "✅ <b>Verification complete!</b>\n\n"
                         f"🔑 <b>{code}</b>\n\n"
                         "Finish signing up here:\n"
-                        f"<a href=\"{WEBAPP_URL}?code={code}\">Open the sign-up form</a>"
+                        f"<a href=\"{WEBAPP_URL}?code={code}\">Link</a>"
                     )
                     telegram("sendMessage", {
                         "chat_id":cid, "text":dm_text, "parse_mode":"HTML"
