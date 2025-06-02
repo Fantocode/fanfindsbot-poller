@@ -17,7 +17,7 @@ ACCESS_COLL      = "accessCodes"
 ASSIGN_COLL      = "userCodes"
 
 # This must point to your index page (not the formResponse link)
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbzLaZ2v9VkVQEnOG8dMYHoNB5QhiAEemjMtRwtY9StcSml8RDsRO5zJHntDcp3G-VDTFQ/exec"
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbxX9rZc_WgPE9Lbz29eADET0Frt5Pk3064-nXl0F9iCZm6wAhopPAI3Z96giQTcc0w/exec"
 
 
 # ── TELEGRAM “wrapper” ─────────────────────────────────────────────────────────
