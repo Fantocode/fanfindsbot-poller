@@ -17,7 +17,7 @@ ACCESS_COLL      = "accessCodes"
 ASSIGN_COLL      = "userCodes"
 
 # This must point to your index page (not the formResponse link)
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycby-latzetN2RNKnIC3OSBq_bKdzTJ9GNTOK-dDe_4kQOnivsnAAvcsaVJcqOA1L9ZngwA/exec"  
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycby-latzetN2RNKnIC3OSBq_bKdzTJ9GNTOK-dDe_4kQOnivsnAAvcsaVJcqOA1L9ZngwA/exec"
 
 
 # ── TELEGRAM “wrapper” ─────────────────────────────────────────────────────────
@@ -92,6 +92,8 @@ def fetch_unused_code():
 def mark_used(code):
     """
     Sets used = true on that code document in accessCodes.
+    (We no longer call this here; it will be invoked by the Apps Script
+    when the user actually enters the code on the Index page.)
     """
     url = (
         f"{FIRESTORE_BASE}/{ACCESS_COLL}/{requests.utils.quote(code)}"
@@ -158,11 +160,14 @@ def poll():
     Continuously polls for Telegram updates. Handles:
       • A user sending /start or /getcode in private DM
         → checks Onboarding-group membership, fetches or re-uses a code,
-          marks it “used,” persists assignment, then DMs:
+          stores it in userCodes with codeSent=True, then DMs:
           “✅ Verification complete! 🔑 <code>
            Finish signing up here: <Link>”
-      • If user leaves or (re)joins either the ONBOARDING_GROUP or HQ_GROUP,
-        → clears any existing assignment so they can come back later.
+        → does NOT mark the code used yet—they are only “reserved” until
+          they actually input it on Index.html.
+
+      • If user leaves or (re)joins either ONBOARDING_GROUP or HQ_GROUP,
+        → clears any existing assignment so they can re‐apply later.
     """
     offset = 0
     while True:
@@ -191,7 +196,7 @@ def poll():
 
                 # 4) (Optional) If someone joined the HQ_GROUP, you could note that here
                 # if nc and group_id == HQ_GROUP_ID:
-                #     pass  # e.g. remove an “inviteSent” flag, etc.
+                #     pass
 
                 # 5) Now handle a DM in private: /start or /getcode
                 text = msg.get("text", "").strip().lower()
@@ -216,8 +221,8 @@ def poll():
                             })
                             continue
 
-                        # Mark the code used in Firestore and record assignment
-                        mark_used(code)
+                        # **Do NOT call mark_used(code) here.**
+                        # Instead, just reserve it in userCodes until they enter it on Index.html.
                         upsert_assignment(str(cid), code, True)
 
                         dm_text = (
