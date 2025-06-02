@@ -15,7 +15,7 @@ ACCESS_COLL     = "accessCodes"    # name of collection holding codes
 ASSIGN_COLL     = "userCodes"      # name of collection for user→code assignments
 
 # This must point to your index page (not the formResponse link)
-WEBAPP_URL      = "https://script.google.com/macros/s/AKfycbw0G5zPhY746zM-LxPLKORBnVg2lbMsdJ_t7KtKRsUidXd882E8CgjrHV9iCLfkscg3mg/exec"  
+WEBAPP_URL      = "https://script.google.com/macros/s/AKfycby-latzetN2RNKnIC3OSBq_bKdzTJ9GNTOK-dDe_4kQOnivsnAAvcsaVJcqOA1L9ZngwA/exec"  
 
 # ── TELEGRAM “wrapper” ──────────────────────────────────────────────────────
 def telegram(method, payload):
