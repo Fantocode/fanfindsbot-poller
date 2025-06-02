@@ -16,9 +16,10 @@ FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/d
 ACCESS_COLL      = "accessCodes"
 ASSIGN_COLL      = "userCodes"
 
-# This must point to your index page (not the formResponse link)
-WEBAPP_URL       = "https://script.google.com/macros/s/AKfycbypJdEqVoPKwJQaDvQ6rge6OPLoCIHQDwXiQeR06uI8nmGvhlp2YFuqZ5Wnj4XvejY_HQ/exec"
-
+# Instead of hard-coding the Web App URL, read it from an env var:
+WEBAPP_URL = os.environ.get("FANFINDS_WEBAPP_URL", "").strip()
+if not WEBAPP_URL:
+    raise RuntimeError("Missing environment variable: FANFINDS_WEBAPP_URL")
 
 # ── TELEGRAM “wrapper” ─────────────────────────────────────────────────────────
 def telegram(method, payload):
