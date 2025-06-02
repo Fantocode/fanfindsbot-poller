@@ -5,26 +5,36 @@ import time
 import requests
 from auth import get_service_account_token
 
-# ── CONFIGURATION (via env vars) ──────────────────────────────────────────────
-BOT_TOKEN       = os.environ['TELEGRAM_BOT_TOKEN']
-PROJECT_ID      = os.environ['FIREBASE_PROJECT_ID']
-ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']   # e.g. "-1001234567890"
-# Firestore REST base:
-FIRESTORE_BASE  = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
-ACCESS_COLL     = "accessCodes"    # name of collection holding codes
-ASSIGN_COLL     = "userCodes"      # name of collection for user→code assignments
+# ── CONFIGURATION (via environment variables) ─────────────────────────────────
+BOT_TOKEN        = os.environ['TELEGRAM_BOT_TOKEN']
+PROJECT_ID       = os.environ['FIREBASE_PROJECT_ID']
+ONBOARDING_GROUP = os.environ['ONBOARDING_GROUP_ID']  # e.g. "-1001234567890"
+HQ_GROUP_ID      = os.environ['HQ_GROUP_ID']         # e.g. "-1009876543210"
+
+# Firestore REST base URL and collection names
+FIRESTORE_BASE   = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
+ACCESS_COLL      = "accessCodes"
+ASSIGN_COLL      = "userCodes"
 
 # This must point to your index page (not the formResponse link)
-WEBAPP_URL      = "https://script.google.com/macros/s/AKfycby-latzetN2RNKnIC3OSBq_bKdzTJ9GNTOK-dDe_4kQOnivsnAAvcsaVJcqOA1L9ZngwA/exec"  
+WEBAPP_URL       = "https://script.google.com/macros/s/AKfycby-latzetN2RNKnIC3OSBq_bKdzTJ9GNTOK-dDe_4kQOnivsnAAvcsaVJcqOA1L9ZngwA/exec"  
 
-# ── TELEGRAM “wrapper” ──────────────────────────────────────────────────────
+
+# ── TELEGRAM “wrapper” ─────────────────────────────────────────────────────────
 def telegram(method, payload):
+    """
+    Low-level helper for Telegram Bot API calls.
+    """
     return requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
         json=payload
     ).json()
 
+
 def get_updates(offset):
+    """
+    Long-poll getUpdates; only fetch “message” and “chat_member” events.
+    """
     resp = requests.get(
         f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
         params={
@@ -32,31 +42,41 @@ def get_updates(offset):
             "offset": offset,
             "allowed_updates": ["message", "chat_member"]
         }
-    ).json().get("result", [])
-    return resp
+    ).json()
+    return resp.get("result", [])
 
-def get_member_status(chat_id):
-    """Calls getChatMember to see if user is still in your onboarding group."""
+
+def get_member_status(chat_id, group_id):
+    """
+    Calls getChatMember to see if user is still a member of the specified group.
+    Returns status string (“member”, “left”, etc.), or None on error.
+    """
     resp = telegram("getChatMember", {
-        "chat_id": ONBOARDING_GROUP,
+        "chat_id": group_id,
         "user_id": chat_id
     })
     return resp.get("result", {}).get("status")
 
-# ── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+
+# ── FIRESTORE HELPERS ──────────────────────────────────────────────────────────
 def fetch_unused_code():
-    """Queries Firestore for one unused (used==false) access code."""
-    q = {"structuredQuery": {
-        "from": [{"collectionId": ACCESS_COLL}],
-        "where": {
-            "fieldFilter": {
-                "field": {"fieldPath": "used"},
-                "op": "EQUAL",
-                "value": {"booleanValue": False}
-            }
-        },
-        "limit": 1
-    }}
+    """
+    Queries Firestore for one unused access-code document (where used == false).
+    Returns the code string, or None if none remain.
+    """
+    q = {
+        "structuredQuery": {
+            "from": [{"collectionId": ACCESS_COLL}],
+            "where": {
+                "fieldFilter": {
+                    "field": {"fieldPath": "used"},
+                    "op": "EQUAL",
+                    "value": {"booleanValue": False}
+                }
+            },
+            "limit": 1
+        }
+    }
     token = get_service_account_token()
     rows = requests.post(
         f"{FIRESTORE_BASE}:runQuery",
@@ -65,13 +85,18 @@ def fetch_unused_code():
     ).json()
     for r in rows:
         if "document" in r:
-            # Extract the document ID (access‐code string)
             return r["document"]["name"].split("/")[-1]
     return None
 
+
 def mark_used(code):
-    """Sets used=true on that code document in accessCodes."""
-    url = f"{FIRESTORE_BASE}/{ACCESS_COLL}/{requests.utils.quote(code)}?updateMask.fieldPaths=used"
+    """
+    Sets used = true on that code document in accessCodes.
+    """
+    url = (
+        f"{FIRESTORE_BASE}/{ACCESS_COLL}/{requests.utils.quote(code)}"
+        + "?updateMask.fieldPaths=used"
+    )
     token = get_service_account_token()
     requests.patch(
         url,
@@ -79,8 +104,13 @@ def mark_used(code):
         json={"fields": {"used": {"booleanValue": True}}}
     )
 
+
 def get_assignment(chat_id):
-    """Fetches user→code record for this chat_id, if any."""
+    """
+    Fetches userCodes/{chat_id}. Returns dict:
+      { "code": <stringValue>, "codeSent": <booleanValue> }
+    or None if no document exists.
+    """
     url = f"{FIRESTORE_BASE}/{ASSIGN_COLL}/{chat_id}"
     token = get_service_account_token()
     r = requests.get(url, headers={"Authorization": f"Bearer {token}"})
@@ -92,8 +122,12 @@ def get_assignment(chat_id):
         }
     return None
 
+
 def upsert_assignment(chat_id, code, sent_flag):
-    """Creates or updates userCodes/{chat_id} with code & codeSent flag."""
+    """
+    Creates or updates userCodes/{chat_id} with fields:
+      code (string), codeSent (boolean).
+    """
     url = f"{FIRESTORE_BASE}/{ASSIGN_COLL}/{chat_id}"
     token = get_service_account_token()
     body = {
@@ -108,50 +142,72 @@ def upsert_assignment(chat_id, code, sent_flag):
         json=body
     )
 
+
 def delete_assignment(chat_id):
-    """Deletes userCodes/{chat_id}."""
+    """
+    Deletes the document userCodes/{chat_id}, if it exists.
+    """
     url = f"{FIRESTORE_BASE}/{ASSIGN_COLL}/{chat_id}"
     token = get_service_account_token()
     requests.delete(url, headers={"Authorization": f"Bearer {token}"})
 
-# ── MAIN POLLING LOOP ────────────────────────────────────────────────────────
+
+# ── MAIN POLLING LOOP ──────────────────────────────────────────────────────────
 def poll():
+    """
+    Continuously polls for Telegram updates. Handles:
+      • A user sending /start or /getcode in private DM
+        → checks Onboarding-group membership, fetches or re-uses a code,
+          marks it “used,” persists assignment, then DMs:
+          “✅ Verification complete! 🔑 <code>
+           Finish signing up here: <Link>”
+      • If user leaves or (re)joins either the ONBOARDING_GROUP or HQ_GROUP,
+        → clears any existing assignment so they can come back later.
+    """
     offset = 0
     while True:
         updates = get_updates(offset)
         for upd in updates:
             offset = upd["update_id"] + 1
 
-            # If someone left or joined the group, we clear any old assignment
             if upd.get("message"):
                 msg = upd["message"]
-                # “left_chat_member” fires when a user leaves ANY chat (we check if it’s your group)
                 lc = msg.get("left_chat_member")
-                if lc and msg.get("chat", {}).get("id") == int(ONBOARDING_GROUP):
-                    delete_assignment(lc["id"])
-
-                # “new_chat_member” when a user (re)joins the group
                 nc = msg.get("new_chat_member")
-                if nc and msg.get("chat", {}).get("id") == int(ONBOARDING_GROUP):
-                    delete_assignment(nc["id"])
+                chat_info = msg.get("chat", {})
+                group_id = str(chat_info.get("id"))
 
-                # Now handle a direct DM in private
-                text = msg.get("text", "").strip()
+                # 1) If someone left the ONBOARDING_GROUP, delete assignment
+                if lc and group_id == ONBOARDING_GROUP:
+                    delete_assignment(str(lc["id"]))
+
+                # 2) If someone (re)joined the ONBOARDING_GROUP, delete old assignment
+                if nc and group_id == ONBOARDING_GROUP:
+                    delete_assignment(str(nc["id"]))
+
+                # 3) If someone left the HQ_GROUP, delete assignment
+                if lc and group_id == HQ_GROUP_ID:
+                    delete_assignment(str(lc["id"]))
+
+                # 4) (Optional) If someone joined the HQ_GROUP, you could note that here
+                # if nc and group_id == HQ_GROUP_ID:
+                #     pass  # e.g. remove an “inviteSent” flag, etc.
+
+                # 5) Now handle a DM in private: /start or /getcode
+                text = msg.get("text", "").strip().lower()
                 chat = msg.get("chat", {})
-                cid = chat.get("id")
+                cid  = chat.get("id")
 
-                # Only respond to /start (or /getcode) in a private chat
-                if text.lower() in ("/start", "/getcode") and chat.get("type") == "private":
-                    # 1) Verify they are still in the ONBOARDING_GROUP
-                    status = get_member_status(cid)
-                    if status not in ("member", "administrator", "creator"):
-                        # If they’re not a group member, delete any stale assignment and skip
-                        delete_assignment(cid)
+                if text in ("/start", "/getcode") and chat.get("type") == "private":
+                    # Only allow if user is still in ONBOARDING_GROUP
+                    status_onboard = get_member_status(cid, ONBOARDING_GROUP)
+                    if status_onboard not in ("member", "administrator", "creator"):
+                        delete_assignment(str(cid))
                         continue
 
-                    # 2) If they have no assignment yet, or their codeSent=false, assign a new code
+                    # Fetch existing assignment or create a new one
                     rec = get_assignment(str(cid))
-                    if rec is None or not rec.get("code"):
+                    if rec is None or not rec.get("codeSent", False):
                         code = fetch_unused_code()
                         if not code:
                             telegram("sendMessage", {
@@ -160,25 +216,22 @@ def poll():
                             })
                             continue
 
-                        # Mark code as used in accessCodes
-                        #mark_used(code)
-                        # Insert into userCodes: codeSent = true
+                        # Mark the code used in Firestore and record assignment
+                        mark_used(code)
                         upsert_assignment(str(cid), code, True)
 
-                        # 3) DM them the link to YOUR INDEX PAGE (no ?code=…)
                         dm_text = (
-                            "✅ <b>Verification complete!</b>\n\n"
-                            f"🔑 <b>{code}</b>\n\n"
-                            "Finish signing up here: "
-                            f"<a href=\"{WEBAPP_URL}\">Link</a>"
+                            "✅ *Verification complete!*  \n\n"
+                            f"🔑 *{code}*  \n\n"
+                            "Finish signing up here: [Link](%s)" % WEBAPP_URL
                         )
                         telegram("sendMessage", {
                             "chat_id": cid,
                             "text": dm_text,
-                            "parse_mode": "HTML"
+                            "parse_mode": "Markdown"
                         })
                     else:
-                        # They already have a codeSent=true record. Don’t send again.
+                        # They already have codeSent=true; do nothing
                         continue
 
         time.sleep(1)
